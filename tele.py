@@ -1,15 +1,16 @@
 import sqlite3
 import os
 from dotenv import load_dotenv
+from flask import Flask
+import threading
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
 # تحميل ملف البيئة
 load_dotenv("config.env")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
-print("Loaded Token:", BOT_TOKEN)  # اختبار
-
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
+print("Loaded Token:", BOT_TOKEN)
 
 # --- قاعدة البيانات ---
 def init_db():
@@ -31,7 +32,6 @@ def init_db():
         PRIMARY KEY (user_id, button_id)
     )''')
     conn.commit()
-
     conn.close()
     print("✅ قاعدة البيانات تم تهيئتها.")
 
@@ -188,17 +188,26 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(f"🔘 تم الضغط على: {data}")
 
 
-# تشغيل البوت
-def main():
+# --- تشغيل البوت ---
+def run_bot():
     init_db()
     print("✅ قاعدة البيانات جاهزة. شغّل البوت الآن...")
 
     app = Application.builder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler('start', start))
     app.add_handler(CallbackQueryHandler(button_handler))
-
     app.run_polling()
 
 
+# --- سيرفر Flask للحفاظ على عمل البوت على Render ---
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "البوت شغال ✅"
+
+
 if __name__ == "__main__":
-    main()
+    # نشغّل البوت في Thread منفصل
+    threading.Thread(target=run_bot).start()
+    app.run(host="0.0.0.0", port=10000)
